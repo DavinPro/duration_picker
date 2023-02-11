@@ -212,11 +212,15 @@ class _Dial extends StatefulWidget {
     required this.onChanged,
     this.baseUnit = BaseUnit.minute,
     this.snapToMins = 1.0,
+    this.accentColor,
+    this.backgroundColor,
   });
 
   final Duration duration;
   final ValueChanged<Duration> onChanged;
   final BaseUnit baseUnit;
+  final Color? accentColor;
+  final Color? backgroundColor;
 
   /// The resolution of mins of the dial, i.e. if snapToMins = 5.0, only durations of 5min intervals will be selectable.
   final double? snapToMins;
@@ -603,7 +607,7 @@ class _DialState extends State<_Dial> with SingleTickerProviderStateMixin {
         backgroundColor = Colors.grey[200];
         break;
       case Brightness.dark:
-        backgroundColor = themeData.backgroundColor;
+        backgroundColor = themeData.colorScheme.background;
         break;
     }
 
@@ -628,8 +632,8 @@ class _DialState extends State<_Dial> with SingleTickerProviderStateMixin {
           context: context,
           selectedValue: selectedDialValue,
           labels: _buildBaseUnitLabels(theme.textTheme),
-          backgroundColor: backgroundColor,
-          accentColor: themeData.colorScheme.secondary,
+          backgroundColor: widget.backgroundColor ?? backgroundColor,
+          accentColor: widget.accentColor ?? themeData.colorScheme.secondary,
           theta: _theta.value,
           textDirection: Directionality.of(context),
         ),
@@ -654,6 +658,8 @@ class DurationPickerDialog extends StatefulWidget {
     this.baseUnit = BaseUnit.minute,
     this.snapToMins = 1.0,
     this.decoration,
+    this.accentColor,
+    this.backgroundColor,
   }) : super(key: key);
 
   /// The duration initially selected when the dialog is shown.
@@ -661,6 +667,10 @@ class DurationPickerDialog extends StatefulWidget {
   final BaseUnit baseUnit;
   final double snapToMins;
   final BoxDecoration? decoration;
+  /// The color used to paint the selected portion of the picker ring.
+  final Color? accentColor;
+  /// The color used to paint the background of the picker ring.
+  final Color? backgroundColor;
 
   @override
   DurationPickerDialogState createState() => DurationPickerDialogState();
@@ -713,6 +723,8 @@ class DurationPickerDialogState extends State<DurationPickerDialog> {
           onChanged: _handleTimeChanged,
           baseUnit: widget.baseUnit,
           snapToMins: widget.snapToMins,
+          accentColor: widget.accentColor,
+          backgroundColor: widget.backgroundColor,
         ),
       ),
     );
@@ -816,6 +828,10 @@ Future<Duration?> showDurationPicker({
   BaseUnit baseUnit = BaseUnit.minute,
   double snapToMins = 1.0,
   BoxDecoration? decoration,
+  /// The color used to paint the selected portion of the picker ring.
+  Color? accentColor,
+  /// The color used to paint the background of the picker ring.
+  Color? backgroundColor,
 }) async {
   return showDialog<Duration>(
     context: context,
@@ -824,6 +840,8 @@ Future<Duration?> showDurationPicker({
       baseUnit: baseUnit,
       snapToMins: snapToMins,
       decoration: decoration,
+      accentColor: accentColor,
+      backgroundColor: backgroundColor,
     ),
   );
 }
@@ -838,6 +856,11 @@ class DurationPicker extends StatelessWidget {
   final double? width;
   final double? height;
 
+  /// The color used to paint the selected portion of the picker ring.
+  final Color? accentColor;
+  /// The color used to paint the background of the picker ring.
+  final Color? backgroundColor;
+
   const DurationPicker({
     Key? key,
     this.duration = Duration.zero,
@@ -846,6 +869,8 @@ class DurationPicker extends StatelessWidget {
     this.snapToMins,
     this.width,
     this.height,
+    this.accentColor,
+    this.backgroundColor,
   }) : super(key: key);
 
   @override
@@ -863,6 +888,8 @@ class DurationPicker extends StatelessWidget {
               onChanged: onChange,
               baseUnit: baseUnit,
               snapToMins: snapToMins,
+              accentColor: accentColor,
+              backgroundColor: backgroundColor,
             ),
           ),
         ],
