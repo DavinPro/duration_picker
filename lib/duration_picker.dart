@@ -214,6 +214,8 @@ class _Dial extends StatefulWidget {
     this.snapToMins = 1.0,
     this.accentColor,
     this.backgroundColor,
+    this.minDuration,
+    this.maxDuration,
   });
 
   final Duration duration;
@@ -221,6 +223,8 @@ class _Dial extends StatefulWidget {
   final BaseUnit baseUnit;
   final Color? accentColor;
   final Color? backgroundColor;
+  final Duration? minDuration;
+  final Duration? maxDuration;
 
   /// The resolution of mins of the dial, i.e. if snapToMins = 5.0, only durations of 5min intervals will be selectable.
   final double? snapToMins;
@@ -279,7 +283,7 @@ class _DialState extends State<_Dial> with SingleTickerProviderStateMixin {
   late Animation<double> _theta;
   late AnimationController _thetaController;
 
-  final double _pct = 0.0;
+  final double _pct = 10.0;
   int _secondaryUnitValue = 0;
   bool _dragging = false;
   int _baseUnitValue = 0;
@@ -398,17 +402,30 @@ class _DialState extends State<_Dial> with SingleTickerProviderStateMixin {
   }
 
   void _updateThetaForPan() {
+    final offset = _position! - _center!;
+    final angle = (math.atan2(offset.dx, offset.dy) - _kPiByTwo) % _kTwoPi;
+
+    // Stop accidental abrupt pans from making the dial seem like it starts from 1h.
+    // (happens when wanting to pan from 0 clockwise, but when doing so quickly, one actually pans from before 0 (e.g. setting the duration to 59mins, and then crossing 0, which would then mean 1h 1min).
+    if (angle >= _kCircleTop &&
+        _theta.value <= _kCircleTop &&
+        _theta.value >= 0.1 && // to allow the radians sign change at 15mins.
+        _secondaryUnitValue == 0) return;
+
+    // Prevent dial from going below _minDuration or above _maxDuration
+    if (widget.minDuration != null || widget.maxDuration != null) {
+      final Duration currentDuration = _angleToDuration(_turningAngle);
+      final double diff = _theta.value - angle;
+      final bool increasing = diff > -0.001 || diff < -1 ;
+      final bool decreasing = !increasing && diff.abs() > 0.001;
+
+      if (widget.minDuration != null && decreasing && currentDuration <= widget.minDuration! ||
+          widget.maxDuration != null && increasing && currentDuration >= widget.maxDuration!) {
+          return;
+      }
+    }
+
     setState(() {
-      final offset = _position! - _center!;
-      final angle = (math.atan2(offset.dx, offset.dy) - _kPiByTwo) % _kTwoPi;
-
-      // Stop accidental abrupt pans from making the dial seem like it starts from 1h.
-      // (happens when wanting to pan from 0 clockwise, but when doing so quickly, one actually pans from before 0 (e.g. setting the duration to 59mins, and then crossing 0, which would then mean 1h 1min).
-      if (angle >= _kCircleTop &&
-          _theta.value <= _kCircleTop &&
-          _theta.value >= 0.1 && // to allow the radians sign change at 15mins.
-          _secondaryUnitValue == 0) return;
-
       _thetaTween
         ..begin = angle
         ..end = angle;
@@ -652,6 +669,7 @@ class DurationPickerDialog extends StatefulWidget {
   /// Creates a duration picker.
   ///
   /// [initialTime] must not be null.
+  /// [minDuration] <= [initialTime] <= [maxDuration]
   const DurationPickerDialog({
     Key? key,
     required this.initialTime,
@@ -660,6 +678,8 @@ class DurationPickerDialog extends StatefulWidget {
     this.decoration,
     this.accentColor,
     this.backgroundColor,
+    this.minDuration,
+    this.maxDuration,
   }) : super(key: key);
 
   /// The duration initially selected when the dialog is shown.
@@ -667,10 +687,14 @@ class DurationPickerDialog extends StatefulWidget {
   final BaseUnit baseUnit;
   final double snapToMins;
   final BoxDecoration? decoration;
-  /// The color used to paint the selected portion of the picker ring.
+  /// The [Color] used to paint the selected portion of the picker ring.
   final Color? accentColor;
-  /// The color used to paint the background of the picker ring.
+  /// The [Color] used to paint the background of the picker ring.
   final Color? backgroundColor;
+  /// The minimum [Duration] that can be selected.
+  final Duration? minDuration;
+  /// The maximum [Duration] that can be selected.
+  final Duration? maxDuration;
 
   @override
   DurationPickerDialogState createState() => DurationPickerDialogState();
@@ -679,6 +703,9 @@ class DurationPickerDialog extends StatefulWidget {
 class DurationPickerDialogState extends State<DurationPickerDialog> {
   @override
   void initState() {
+	assert(widget.minDuration == null || widget.minDuration! <= widget.initialTime);
+	assert(widget.maxDuration == null || widget.maxDuration! >= widget.initialTime);
+	assert(widget.minDuration == null || widget.maxDuration == null || widget.minDuration! <= widget.maxDuration!);
     super.initState();
     _selectedDuration = widget.initialTime;
   }
@@ -725,6 +752,8 @@ class DurationPickerDialogState extends State<DurationPickerDialog> {
           snapToMins: widget.snapToMins,
           accentColor: widget.accentColor,
           backgroundColor: widget.backgroundColor,
+          minDuration: widget.minDuration,
+          maxDuration: widget.maxDuration,
         ),
       ),
     );
@@ -832,7 +861,15 @@ Future<Duration?> showDurationPicker({
   Color? accentColor,
   /// The color used to paint the background of the picker ring.
   Color? backgroundColor,
+  /// The minimum [Duration] that can be selected.
+  Duration? minDuration,
+ /// The maximum [Duration] that can be selected.
+  Duration? maxDuration,
 }) async {
+  assert(minDuration == null || minDuration <= initialTime);
+  assert(maxDuration == null || maxDuration >= initialTime);
+  assert(minDuration == null || maxDuration == null || minDuration <= maxDuration);
+
   return showDialog<Duration>(
     context: context,
     builder: (BuildContext context) => DurationPickerDialog(
@@ -842,6 +879,8 @@ Future<Duration?> showDurationPicker({
       decoration: decoration,
       accentColor: accentColor,
       backgroundColor: backgroundColor,
+      minDuration: minDuration,
+      maxDuration: maxDuration,
     ),
   );
 }
@@ -861,6 +900,11 @@ class DurationPicker extends StatelessWidget {
   /// The color used to paint the background of the picker ring.
   final Color? backgroundColor;
 
+  /// The minimum [Duration] that can be selected.
+  final Duration? minDuration;
+  /// The maximum [Duration] that can be selected.
+  final Duration? maxDuration;
+
   const DurationPicker({
     Key? key,
     this.duration = Duration.zero,
@@ -871,7 +915,12 @@ class DurationPicker extends StatelessWidget {
     this.height,
     this.accentColor,
     this.backgroundColor,
-  }) : super(key: key);
+    this.minDuration,
+    this.maxDuration,
+  }) : assert(minDuration == null || minDuration <= duration),
+       assert(maxDuration == null || maxDuration >= duration),
+       assert(minDuration == null || maxDuration == null || minDuration <= maxDuration),
+       super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -890,6 +939,8 @@ class DurationPicker extends StatelessWidget {
               snapToMins: snapToMins,
               accentColor: accentColor,
               backgroundColor: backgroundColor,
+              minDuration: minDuration,
+              maxDuration: maxDuration,
             ),
           ),
         ],
